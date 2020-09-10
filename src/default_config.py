@@ -19,16 +19,16 @@ def get_default_config():
     conf = EasyDict()
 
     # ----------------------training---------------
-    conf.lr = 1e-1
+    conf.lr = 1e-3
     # [9, 13, 15]
-    conf.milestones = [10, 15, 22]  # down learing rate
+    conf.milestones = [50, 150, 220]  # down learing rate
     conf.gamma = 0.1
-    conf.epochs = 25
+    conf.epochs = 250
     conf.momentum = 0.9
-    conf.batch_size = 1024
+    conf.batch_size = 64
 
     # model
-    conf.num_classes = 3
+    conf.num_classes = 2
     conf.input_channel = 3
     conf.embedding_size = 128
 
@@ -41,9 +41,9 @@ def get_default_config():
     # log path
     conf.log_path = './saved_logs/jobs'
     # tensorboard
-    conf.board_loss_every = 10
+    conf.board_loss_every = 1000
     # save model/iter
-    conf.save_every = 30
+    conf.save_every_epoch = 3
 
     return conf
 
