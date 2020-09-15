@@ -57,7 +57,7 @@ class TrainMain:
                 self.writer = SummaryWriter(self.conf.log_path)
                 is_first = False
             print('epoch {} started'.format(e))
-            print("lr: ", self.schedule_lr.get_lr())
+            print("lr: ", self.schedule_lr.get_last_lr())
 
             for sample, ft_sample, target in tqdm(iter(self.train_loader)):
                 imgs = [sample, ft_sample]

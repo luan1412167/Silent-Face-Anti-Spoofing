@@ -11,11 +11,11 @@ import math
 import torch
 import numpy as np
 import torch.nn.functional as F
-
+import time
 
 from src.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2,MiniFASNetV1SE,MiniFASNetV2SE
 from src.data_io import transform as trans
-from src.utility import get_kernel, parse_model_name
+from src.utility import get_kernel, parse_model_name, parse_model_name_new_format
 
 MODEL_MAPPING = {
     'MiniFASNetV1': MiniFASNetV1,
@@ -30,7 +30,7 @@ class Detection:
         caffemodel = "./resources/detection_model/Widerface-RetinaFace.caffemodel"
         deploy = "./resources/detection_model/deploy.prototxt"
         self.detector = cv2.dnn.readNetFromCaffe(deploy, caffemodel)
-        self.detector_confidence = 0.6
+        self.detector_confidence = 0.95
 
     def get_bbox(self, img):
         height, width = img.shape[0], img.shape[1]
@@ -59,7 +59,9 @@ class AntiSpoofPredict(Detection):
     def _load_model(self, model_path):
         # define model
         model_name = os.path.basename(model_path)
+        # h_input, w_input, model_type, _ = parse_model_name_new_format(model_name)
         h_input, w_input, model_type, _ = parse_model_name(model_name)
+
         self.kernel_size = get_kernel(h_input, w_input,)
         self.model = MODEL_MAPPING[model_type](conv6_kernel=self.kernel_size).to(self.device)
 
@@ -72,15 +74,47 @@ class AntiSpoofPredict(Detection):
             new_state_dict = OrderedDict()
             for key, value in state_dict.items():
                 name_key = key[7:]
+                # if "model." == name_key[:6]:
+                #     name_key = name_key[6:]
                 new_state_dict[name_key] = value
-            self.model.load_state_dict(new_state_dict)
+            # print(new_state_dict)
+            self.model.load_state_dict(new_state_dict, strict=False)
         else:
-            self.model.load_state_dict(state_dict)
+            from collections import OrderedDict
+            new_state_dict = OrderedDict()
+            for key, value in state_dict.items():
+                # print(key)
+                name_key = key
+                if "model." == name_key[:6]:
+                    name_key = name_key[6:]
+                new_state_dict[name_key] = value
+            self.model.load_state_dict(new_state_dict, strict=False)
         return None
 
     def predict(self, img, model_path):
+        rgb_mean = (0.4914, 0.4822, 0.4465)
+        rgb_std = (0.2023, 0.1994, 0.2010)
+        mean=[0.485, 0.456, 0.406]
+        std=[0.229, 0.224, 0.225]
         test_transform = trans.Compose([
             trans.ToTensor(),
+            trans.Normalize(rgb_mean, rgb_std)
+        ])
+        img = test_transform(img)
+        img = img.unsqueeze(0).to(self.device)
+        self._load_model(model_path)
+        self.model.eval()
+        with torch.no_grad():
+            result = self.model.forward(img)
+            result = F.softmax(result).cpu().numpy()
+        return result
+
+    def predict_non_normalize(self, img, model_path):
+        rgb_mean = (0.4914, 0.4822, 0.4465)
+        rgb_std = (0.2023, 0.1994, 0.2010)
+        test_transform = trans.Compose([
+            trans.ToTensor(),
+            # trans.Normalize(rgb_mean, rgb_std)
         ])
         img = test_transform(img)
         img = img.unsqueeze(0).to(self.device)
