@@ -16,7 +16,7 @@ def parse_args():
     desc = "Silence-FAS"
     parser = argparse.ArgumentParser(description=desc)
     parser.add_argument("--device_ids", type=str, default="0", help="which gpu id, 0123")
-    parser.add_argument("--patch_info", type=str, default="2.7_112x112",
+    parser.add_argument("--patch_info", type=str, default="1.2_112x112",
                         help="[org_1_80x60 / 1_80x80 / 2.7_80x80 / 4_80x80]")
     args = parser.parse_args()
     cuda_devices = [int(elem) for elem in args.device_ids]
@@ -32,6 +32,7 @@ if __name__ == "__main__":
     trainer = TrainMain(conf)
     trainer.train_model()
     # transfer learning
-    # trainer.train_model("/home/dmp/luan_workspace/Silent-Face-Anti-Spoofing/resources/anti_spoof_models/2.7_80x80_MiniFASNetV2.pth")
+    # model_path = '/home/dmp/Silent-Face-Anti-Spoofing/resources/temp/2.7_80x80_MiniFASNetV2.pth'
+    # trainer.train_model(model_path)
 
 

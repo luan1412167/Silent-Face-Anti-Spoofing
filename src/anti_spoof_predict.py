@@ -59,8 +59,8 @@ class AntiSpoofPredict(Detection):
     def _load_model(self, model_path):
         # define model
         model_name = os.path.basename(model_path)
-        # h_input, w_input, model_type, _ = parse_model_name_new_format(model_name)
-        h_input, w_input, model_type, _ = parse_model_name(model_name)
+        h_input, w_input, model_type, _ = parse_model_name_new_format(model_name)
+        # h_input, w_input, model_type, _ = parse_model_name(model_name)
 
         self.kernel_size = get_kernel(h_input, w_input,)
         self.model = MODEL_MAPPING[model_type](conv6_kernel=self.kernel_size).to(self.device)
@@ -92,13 +92,11 @@ class AntiSpoofPredict(Detection):
         return None
 
     def predict(self, img, model_path):
-        rgb_mean = (0.4914, 0.4822, 0.4465)
-        rgb_std = (0.2023, 0.1994, 0.2010)
         mean=[0.485, 0.456, 0.406]
         std=[0.229, 0.224, 0.225]
         test_transform = trans.Compose([
             trans.ToTensor(),
-            trans.Normalize(rgb_mean, rgb_std)
+            trans.Normalize(mean, std)
         ])
         img = test_transform(img)
         img = img.unsqueeze(0).to(self.device)
@@ -110,8 +108,8 @@ class AntiSpoofPredict(Detection):
         return result
 
     def predict_non_normalize(self, img, model_path):
-        rgb_mean = (0.4914, 0.4822, 0.4465)
-        rgb_std = (0.2023, 0.1994, 0.2010)
+        mean=[0.485, 0.456, 0.406]
+        std=[0.229, 0.224, 0.225]
         test_transform = trans.Compose([
             trans.ToTensor(),
             # trans.Normalize(rgb_mean, rgb_std)

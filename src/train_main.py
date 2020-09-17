@@ -8,6 +8,7 @@
 import torch
 from torch import optim
 from torch.nn import CrossEntropyLoss, MSELoss, BCELoss, BCEWithLogitsLoss
+from torch import nn
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
@@ -16,6 +17,32 @@ from src.model_lib.MultiFTNet import MultiFTNet, MultiFTNetReload
 from src.data_io.dataset_loader import get_data_loader
 import torch.nn.functional as F
 
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma = 2, eps = 1e-7):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.eps = eps
+        self.ce = nn.CrossEntropyLoss(reduction='none')
+
+    def forward(self, input, target):
+        logp = self.ce(input, target)
+        p = torch.exp(-logp)
+        loss = (1 - p) ** self.gamma * logp
+        return loss.mean()
+
+
+class DepthFocalLoss(nn.Module):
+    def __init__(self, gamma = 1, eps = 1e-7):
+        super(DepthFocalLoss, self).__init__()
+        self.gamma = gamma
+        self.eps = eps
+        self.ce = nn.MSELoss(reduction='none')
+
+    def forward(self, input, target):
+        loss = self.ce(input, target)
+        loss = (loss) ** self.gamma
+        return loss.mean()
 class TrainMain:
     def __init__(self, conf):
         self.conf = conf
@@ -28,10 +55,13 @@ class TrainMain:
     def train_model(self):
         self._init_model_param()
         self._train_stage()
-
+    
     def _init_model_param(self):
-        self.cls_criterion = CrossEntropyLoss()
-        self.ft_criterion = MSELoss()
+        # self.cls_criterion = CrossEntropyLoss()
+        # self.ft_criterion = MSELoss()
+        self.cls_criterion = FocalLoss()
+        self.ft_criterion = DepthFocalLoss()
+
         self.model = self._define_network()
         self.optimizer = optim.SGD(self.model.module.parameters(),
                                    lr=self.conf.lr,
@@ -65,11 +95,7 @@ class TrainMain:
                 self.writer = SummaryWriter(self.conf.log_path)
                 is_first = False
             print('epoch {} started'.format(e))
-<<<<<<< HEAD
-            print("lr: ", self.schedule_lr.get_last_lr())
-=======
             print("lr: ", self.optimizer.param_groups[0]['lr'])
->>>>>>> 5acd44edad9c058245ca5d650093503dcce65df4
 
             for sample, ft_sample, target in tqdm(iter(self.train_loader)):
                 imgs = [sample, ft_sample]

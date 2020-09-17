@@ -12,8 +12,8 @@ import torch
 
 
 def get_data_loader(conf):
-    rgb_mean = (0.4914, 0.4822, 0.4465)
-    rgb_std = (0.2023, 0.1994, 0.2010)
+    mean=[0.485, 0.456, 0.406]
+    std=[0.229, 0.224, 0.225]
     train_transform = trans.Compose([
         trans.ToPILImage(),
         trans.RandomResizedCrop(size=tuple(conf.input_size),
@@ -23,7 +23,7 @@ def get_data_loader(conf):
         trans.RandomRotation(10),
         trans.RandomHorizontalFlip(),
         trans.ToTensor(),
-        trans.Normalize(rgb_mean, rgb_std),
+        trans.Normalize(mean, std)
     ])
     root_path = '{}/{}'.format(conf.train_root_path, conf.patch_info)
     trainset = DatasetFolderFT(root_path + "/train" , train_transform,

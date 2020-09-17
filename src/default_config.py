@@ -21,19 +21,11 @@ def get_default_config():
     # ----------------------training---------------
     conf.lr = 1e-3
     # [9, 13, 15]
-<<<<<<< HEAD
-    conf.milestones = [100, 350, 500, 700]  # down learing rate
-    conf.gamma = 0.1
-    conf.epochs = 1000
-    conf.momentum = 0.9
-    conf.batch_size = 5
-=======
     conf.milestones = [50, 150, 220]  # down learing rate
     conf.gamma = 0.1
     conf.epochs = 250
     conf.momentum = 0.9
-    conf.batch_size = 64
->>>>>>> 5acd44edad9c058245ca5d650093503dcce65df4
+    conf.batch_size = 32
 
     # model
     conf.num_classes = 2
@@ -51,11 +43,7 @@ def get_default_config():
     # tensorboard
     conf.board_loss_every = 1000
     # save model/iter
-<<<<<<< HEAD
-    conf.save_every = 50
-=======
     conf.save_every_epoch = 3
->>>>>>> 5acd44edad9c058245ca5d650093503dcce65df4
 
     return conf
 
