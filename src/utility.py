@@ -39,7 +39,7 @@ def parse_model_name(model_name):
 def parse_model_name_new_format(model_name):
     info = model_name.split('_')[0:-2]
     h_input, w_input = info[-1].split('x')
-    model_type = "MiniFASNetV1"
+    model_type = "MiniFASNetV2SE"
 
     if info[0] == "org":
         scale = None
@@ -82,10 +82,10 @@ class BinaryClassificationMeter(object):
     def update(self, pred, target):
         pred = torch.tensor(pred)
         target = torch.tensor(target)
-        self.tp += pred.mul(target).sum(0).float()
-        self.tn += (1 - pred).mul(1 - target).sum(0).float()
-        self.fp += pred.mul(1 - target).sum(0).float()
-        self.fn += (1 - pred).mul(target).sum(0).float()
+        self.tp = pred.mul(target).sum(0).float()
+        self.tn = (1 - pred).mul(1 - target).sum(0).float()
+        self.fp = pred.mul(1 - target).sum(0).float()
+        self.fn = (1 - pred).mul(target).sum(0).float()
         self.acc = (self.tp + self.tn).sum() / (self.tp + self.tn + self.fp + self.fn).sum()
         self.pre = self.tp / (self.tp + self.fp)
         self.rec = self.tp / (self.tp + self.fn)
@@ -93,3 +93,4 @@ class BinaryClassificationMeter(object):
         self.avg_pre = np.nanmean(self.pre)
         self.avg_rec = np.nanmean(self.rec)
         self.avg_f1 = np.nanmean(self.f1)
+        # print("tp, tn, fp, fn: ", self.tp.item(), self.tn.item(), self.fp.item(), self.fn.item())
