@@ -30,7 +30,7 @@ class Detection:
         caffemodel = "./resources/detection_model/Widerface-RetinaFace.caffemodel"
         deploy = "./resources/detection_model/deploy.prototxt"
         self.detector = cv2.dnn.readNetFromCaffe(deploy, caffemodel)
-        self.detector_confidence = 0.95
+        self.detector_confidence = 0.9
 
     def get_bbox(self, img):
         height, width = img.shape[0], img.shape[1]

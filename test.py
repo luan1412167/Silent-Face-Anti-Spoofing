@@ -92,59 +92,65 @@ def test(image_folder, model_dir, device_id):
 
 
 def test_video(image_name, model_dir, device_id):
-    cap = cv2.VideoCapture("/home/dmp/Videos/testdata/real/2020-09-11-133100.webm")
+    cap = cv2.VideoCapture(0)
+    # cap = cv2.VideoCapture("/home/dmp/Videos/sanity_data/real/2020-09-18-100214.webm")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cv2.namedWindow("image", cv2.WINDOW_NORMAL)
     cv2.namedWindow("img", cv2.WINDOW_NORMAL)
+
+    model_name = os.listdir(model_dir)[0]
+    h_input, w_input, model_type, scale = parse_model_name_new_format(model_name)
+    model_test = AntiSpoofPredict(device_id, os.path.join(model_dir, model_name))
+    image_cropper = CropImage()
+
     while cap.isOpened():
-        model_test = AntiSpoofPredict(device_id)
-        image_cropper = CropImage()
+        # print("here")
         # image = cv2.imread(SAMPLE_IMAGE_PATH + image_name)
         ret, image = cap.read()
         result = check_image(image)
         if result is False:
             return
         image_bbox = model_test.get_bbox(image)
+        if not len(image_bbox):
+            continue
         prediction = np.zeros((1, 2))
         test_speed = 0
         # sum the prediction from single model's result
-        for model_name in os.listdir(model_dir):
-            if model_name != "2020-09-15-15-00_Anti_Spoofing_1.2_112x112_model_iter-6.pth":
-                continue
-            # h_input, w_input, model_type, scale = parse_model_name(model_name)
-            h_input, w_input, model_type, scale = parse_model_name_new_format(model_name)
-            param = {
-                "org_img": image,
-                "bbox": image_bbox,
-                "scale": scale,
-                "out_w": w_input,
-                "out_h": h_input,
-                "crop": True,
-            }
-            print(model_type, scale)
-            if scale is None:
-                param["crop"] = False
-            img = image_cropper.crop(**param)
-            start = time.time()
-            if h_input == 112:
-                model_out = model_test.predict(img, os.path.join(model_dir, model_name))
-            # else:
-            #     model_out = model_test.predict_non_normalize(img, os.path.join(model_dir, model_name))
 
-            # if model_out.shape[1] == 2: 
-            #     model_out = np.expand_dims(np.append(model_out[0], 0.33), axis=0)
-            print(model_out)
-            prediction += model_out
+        param = {
+            "org_img": image,
+            "bbox": image_bbox,
+            "scale": scale,
+            "out_w": w_input,
+            "out_h": h_input,
+            "crop": True,
+        }
+        print(model_type, scale)
+        if scale is None:
+            param["crop"] = False
+        
+        img = image_cropper.crop(**param)
 
-            test_speed += time.time()-start
+        start = time.time()
+        if h_input == 112:
+            model_out = model_test.predict(img)
+        # else:
+        #     model_out = model_test.predict_non_normalize(img, os.path.join(model_dir, model_name))
+
+        # if model_out.shape[1] == 2: 
+        #     model_out = np.expand_dims(np.append(model_out[0], 0.33), axis=0)
+        print(model_out)
+        prediction += model_out
+
+        test_speed += time.time()-start
 
         # draw result of prediction
         label = np.argmax(prediction)
         # print(prediction)
         score = prediction[0][label]
-        # if score < .95:
-        #     label = 0
+        if score < .7:
+            label = 0
         if label == 1:
             print("Image '{}' is Real Face. Score: {:.2f}.".format("image_name", score))
             result_text = "RealFace Score: {:.2f}".format(score)
@@ -219,17 +225,17 @@ def calculate_acc(test_folder, model_dir, device_id):
                 prediction = np.zeros((1, 2))
                 test_speed = 0
 
-                # param = {
-                #     "org_img": image,
-                #     "bbox": image_bbox,
-                #     "scale": scale,
-                #     "out_w": w_input,
-                #     "out_h": h_input,
-                #     "crop": False,
-                # }
-                # if scale is None:
-                #     param["crop"] = False
-                # img = image_cropper.crop(**param)
+                param = {
+                    "org_img": image,
+                    "bbox": image_bbox,
+                    "scale": scale,
+                    "out_w": w_input,
+                    "out_h": h_input,
+                    "crop": False,
+                }
+                if scale is None:
+                    param["crop"] = False
+                img = image_cropper.crop(**param)
                 # img = cv2.resize(image, (80,80))
                 img = image
 
@@ -294,8 +300,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_dir",
         type=str,
-        # default="./resources/anti_spoof_models",
-        default="./saved_logs/snapshot/Anti_Spoofing_1.2_112x112",
+        default="./resources/anti_spoof_models",
+        # default="./saved_logs/snapshot/Anti_Spoofing_1.2_112x112",
         help="model_lib used to test")
     parser.add_argument(
         "--image_name",
