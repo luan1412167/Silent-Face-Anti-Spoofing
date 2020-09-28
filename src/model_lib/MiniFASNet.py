@@ -26,12 +26,12 @@ class Conv_block(Module):
         self.conv = Conv2d(in_c, out_c, kernel_size=kernel, groups=groups,
                            stride=stride, padding=padding, bias=False)
         self.bn = BatchNorm2d(out_c)
-        self.prelu = PReLU(out_c)
+        self.relu = ReLU(out_c)
 
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
-        x = self.prelu(x)
+        x = self.relu(x)
         return x
 
 
