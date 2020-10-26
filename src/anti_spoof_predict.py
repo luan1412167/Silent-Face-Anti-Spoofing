@@ -30,7 +30,7 @@ class Detection:
         caffemodel = "./resources/detection_model/Widerface-RetinaFace.caffemodel"
         deploy = "./resources/detection_model/deploy.prototxt"
         self.detector = cv2.dnn.readNetFromCaffe(deploy, caffemodel)
-        self.detector_confidence = 0.95
+        self.detector_confidence = 0.9
 
     def get_bbox(self, img):
         height, width = img.shape[0], img.shape[1]
@@ -44,17 +44,23 @@ class Detection:
         self.detector.setInput(blob, 'data')
         out = self.detector.forward('detection_out').squeeze()
         max_conf_index = np.argmax(out[:, 2])
+        # print(out[max_conf_index, 2])
         left, top, right, bottom = out[max_conf_index, 3]*width, out[max_conf_index, 4]*height, \
                                    out[max_conf_index, 5]*width, out[max_conf_index, 6]*height
         bbox = [int(left), int(top), int(right-left+1), int(bottom-top+1)]
+        if out[max_conf_index, 2] < self.detector_confidence:
+            bbox = [] 
         return bbox
 
 
 class AntiSpoofPredict(Detection):
-    def __init__(self, device_id):
+    def __init__(self, device_id, model_path):
         super(AntiSpoofPredict, self).__init__()
         self.device = torch.device("cuda:{}".format(device_id)
                                    if torch.cuda.is_available() else "cpu")
+        self._load_model(model_path)
+        # print("init model successfull")
+
 
     def _load_model(self, model_path):
         # define model
@@ -91,7 +97,7 @@ class AntiSpoofPredict(Detection):
             self.model.load_state_dict(new_state_dict, strict=False)
         return None
 
-    def predict(self, img, model_path):
+    def predict(self, img):
         mean=[0.485, 0.456, 0.406]
         std=[0.229, 0.224, 0.225]
         test_transform = trans.Compose([
@@ -100,14 +106,13 @@ class AntiSpoofPredict(Detection):
         ])
         img = test_transform(img)
         img = img.unsqueeze(0).to(self.device)
-        self._load_model(model_path)
         self.model.eval()
         with torch.no_grad():
             result = self.model.forward(img)
             result = F.softmax(result).cpu().numpy()
         return result
 
-    def predict_non_normalize(self, img, model_path):
+    def predict_non_normalize(self, img):
         mean=[0.485, 0.456, 0.406]
         std=[0.229, 0.224, 0.225]
         test_transform = trans.Compose([
@@ -116,7 +121,6 @@ class AntiSpoofPredict(Detection):
         ])
         img = test_transform(img)
         img = img.unsqueeze(0).to(self.device)
-        self._load_model(model_path)
         self.model.eval()
         with torch.no_grad():
             result = self.model.forward(img)
