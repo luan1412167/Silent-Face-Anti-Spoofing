@@ -39,11 +39,7 @@ def parse_model_name(model_name):
 def parse_model_name_new_format(model_name):
     info = model_name.split('_')[0:-2]
     h_input, w_input = info[-1].split('x')
-<<<<<<< HEAD
     model_type = "MiniFASNetV1SE"
-=======
-    model_type = "MiniFASNetV2SE"
->>>>>>> 7f278817363ed4692585b7de026e05461a224ed1
 
     if info[0] == "org":
         scale = None

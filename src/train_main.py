@@ -111,7 +111,8 @@ class TrainMain:
         # self.cls_criterion = CrossEntropyLoss()
         # self.ft_criterion = MSELoss()
         self.cls_criterion = FocalLoss()
-        self.ft_criterion = Contrast_depth_loss()
+        self.ft_criterion_mse = MSELoss()
+        self.ft_criterion_cdl = Contrast_depth_loss()
 
         self.model = self._define_network()
         # self.optimizer = optim.SGD(self.model.module.parameters(),
@@ -205,7 +206,9 @@ class TrainMain:
 
         loss_cls = self.cls_criterion(embeddings, labels)
         # print("feature_map", feature_map.shape, imgs[1].shape)
-        loss_fea = self.ft_criterion(feature_map, imgs[1].to(self.conf.device))
+        loss_fea_mse = self.ft_criterion_mse(feature_map, imgs[1].to(self.conf.device))
+        loss_fea_cdl = self.ft_criterion_cdl(feature_map, imgs[1].to(self.conf.device))
+        loss_fea = 0.5*(loss_fea_mse + loss_fea_cdl)
         loss = 0.7*loss_cls + 0.3*loss_fea
         acc = self._get_accuracy(embeddings, labels)[0]
         loss.backward()

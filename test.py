@@ -93,10 +93,6 @@ def test(image_folder, model_dir, device_id):
 
 def test_video(image_name, model_dir, device_id):
     cap = cv2.VideoCapture(0)
-<<<<<<< HEAD
-=======
-    # cap = cv2.VideoCapture("/home/dmp/Videos/sanity_data/real/2020-09-18-100214.webm")
->>>>>>> 7f278817363ed4692585b7de026e05461a224ed1
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cv2.namedWindow("image", cv2.WINDOW_NORMAL)
