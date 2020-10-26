@@ -92,7 +92,7 @@ def test(image_folder, model_dir, device_id):
 
 
 def test_video(image_name, model_dir, device_id):
-    cap = cv2.VideoCapture("/home/dmp/Videos/testdata/real/2020-09-11-133100.webm")
+    cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cv2.namedWindow("image", cv2.WINDOW_NORMAL)
@@ -178,7 +178,7 @@ def parser_data(test_folder):
     datas = []
     for image_path in image_paths:
         target = image_path.split("/")[-2]
-        datas.append([image_path, int(target)])
+        datas.append([image_path, 1 if target=="real" else 0])
         # print(image_path, int(target))
 
     return datas 
@@ -192,92 +192,94 @@ def calculate_acc(test_folder, model_dir, device_id):
     print("num_of_data ", len(datas))
     idx = 0
     # cv2.namedWindow("image", cv2.WINDOW_NORMAL)
-    for model_name in os.listdir(model_dir):
-        # if model_name != "2020-09-11-02-29_Anti_Spoofing_2.7_112x112_model_iter-9.pth":
-        #     continue
-        print(model_name)
-        # h_input, w_input, model_type, scale = parse_model_name(model_name)
+    for threshold in np.arange(0.9, 0.99, 0.01):
+        for model_name in os.listdir(model_dir):
+            # if model_name != "2020-09-11-02-29_Anti_Spoofing_2.7_112x112_model_iter-9.pth":
+            #     continue
+            print(model_name, threshold)
+            # h_input, w_input, model_type, scale = parse_model_name(model_name)
 
-        h_input, w_input, model_type, scale = parse_model_name_new_format(model_name)
+            h_input, w_input, model_type, scale = parse_model_name_new_format(model_name)
 
-        # for threshold in np.arange(0.60, 0.9, 0.05):
-        if True:
-            pred, truth = [], []
-            bcm = BinaryClassificationMeter()
-            threshold = 0.5
-            print("threshold ", threshold)
-            random.seed(0)
-            random.shuffle(datas)
-            for img_path, target in datas:
-                idx += 1
-                image_name = os.path.basename(img_path)
-                image = cv2.imread(img_path)
-                if image is None:
-                    continue
+            # for threshold in np.arange(0.60, 0.9, 0.05):
+            if True:
+                pred, truth = [], []
+                bcm = BinaryClassificationMeter()
+                # threshold = 0.95
+                random.seed(0)
+                random.shuffle(datas)
+                for img_path, target in datas:
+                    idx += 1
+                    image_name = os.path.basename(img_path)
+                    image = cv2.imread(img_path)
+                    if image is None:
+                        continue
 
-                image_bbox = model_test.get_bbox(image)
-                prediction = np.zeros((1, 2))
-                test_speed = 0
+                    # image_bbox = model_test.get_bbox(image)
+                    prediction = np.zeros((1, 2))
+                    test_speed = 0
 
-                # param = {
-                #     "org_img": image,
-                #     "bbox": image_bbox,
-                #     "scale": scale,
-                #     "out_w": w_input,
-                #     "out_h": h_input,
-                #     "crop": False,
-                # }
-                # if scale is None:
-                #     param["crop"] = False
-                # img = image_cropper.crop(**param)
-                # img = cv2.resize(image, (80,80))
-                img = image
+                    # param = {
+                    #     "org_img": image,
+                    #     "bbox": image_bbox,
+                    #     "scale": scale,
+                    #     "out_w": w_input,
+                    #     "out_h": h_input,
+                    #     "crop": False,
+                    # }
+                    # if scale is None:
+                    #     param["crop"] = False
+                    # img = image_cropper.crop(**param)
+                    # img = cv2.resize(image, (80,80))
+                    img = image
 
 
-                start = time.time()
-                model_out = model_test.predict(img, os.path.join(model_dir, model_name))
-                # print(model_out)
-                prediction += model_out
-                test_speed += time.time()-start
+                    start = time.time()
+                    model_out = model_test.predict(img, os.path.join(model_dir, model_name))
+                    # print(model_out)
+                    prediction += model_out
+                    # print(prediction)
+                    test_speed += time.time()-start
 
-                # draw result of prediction
-                label = np.argmax(prediction)
-                value = prediction[0][label]
-                if value < threshold:
-                    label = 0 
-                if label == 1:
-                    # print("Image '{}' is Real Face. Score: {:.2f}.".format(image_name, value))
-                    result_text = "RealFace Score: {:.2f}".format(value)
-                    color = (255, 0, 0)
-                else:
-                    # print("Image '{}' is Fake Face. Score: {:.2f}.".format(image_name, value))
-                    result_text = "FakeFace Score: {:.2f}".format(value)
-                    color = (0, 0, 255)
-                # print("Prediction cost {:.2f} s".format(test_speed))
-                cv2.rectangle(
-                    image,
-                    (image_bbox[0], image_bbox[1]),
-                    (image_bbox[0] + image_bbox[2], image_bbox[1] + image_bbox[3]),
-                    color, 2)
-                cv2.putText(
-                    image,
-                    result_text,
-                    (image_bbox[0], image_bbox[1] - 5),
-                    cv2.FONT_HERSHEY_COMPLEX, 0.5*image.shape[0]/1024, color)
-                pred.append(label)
-                truth.append(target)
-                # print(idx)
-                # cv2.imshow("image", image)
-                # k = cv2.waitKey(500)
-                # if k == ord("q"):
-                #     break
-                if idx%1000==0:
-                    bcm.update(np.array(pred), np.array(truth))
-                    print("PRE={}, REC={}, F1={}".format(bcm.pre, bcm.rec, bcm.f1))
-                    break
-            bcm.update(np.array(pred), np.array(truth))
-            print("PRE={}, REC={}, F1={}".format(bcm.pre, bcm.rec, bcm.f1))
-            bcm.reset()
+                    # draw result of prediction
+                    label = np.argmax(prediction)
+                    value = prediction[0][label]
+                    if value < threshold:
+                        label = 0 
+                    if label == 1:
+                        # print("Image '{}' is Real Face. Score: {:.2f}.".format(image_name, value))
+                        result_text = "RealFace Score: {:.2f}".format(value)
+                        color = (255, 0, 0)
+                    else:
+                        # print("Image '{}' is Fake Face. Score: {:.2f}.".format(image_name, value))
+                        result_text = "FakeFace Score: {:.2f}".format(value)
+                        color = (0, 0, 255)
+                    # print("Prediction cost {:.2f} s".format(test_speed))
+                    # cv2.rectangle(
+                    #     image,
+                    #     (image_bbox[0], image_bbox[1]),
+                    #     (image_bbox[0] + image_bbox[2], image_bbox[1] + image_bbox[3]),
+                    #     color, 2)
+                    # cv2.putText(
+                    #     image,
+                    #     result_text,
+                    #     (image_bbox[0], image_bbox[1] - 5),
+                    #     cv2.FONT_HERSHEY_COMPLEX, 0.5*image.shape[0]/1024, color)
+                    # print(label, target)
+                    pred.append(label)
+                    truth.append(target)
+                    # print(idx)
+                    # cv2.imshow("image", image)
+                    # k = cv2.waitKey(500)
+                    # if k == ord("q"):
+                    #     break
+                    # if idx%1000==0:
+                    #     bcm.update(np.array(pred), np.array(truth))
+                    #     print("PRE={}, REC={}, F1={}".format(bcm.pre, bcm.rec, bcm.f1))
+                    #     break
+                bcm.update(np.array(pred), np.array(truth))
+                print("PRE={}, REC={}, F1={}".format(bcm.pre, bcm.rec, bcm.f1))
+                bcm.reset()
                 # format_ = os.path.splitext(image_name)[-1]
             # result_image_name = image_name.replace(format_, "_result" + format_)
             # cv2.imwrite(SAMPLE_IMAGE_PATH + result_image_name, image)
@@ -295,7 +297,7 @@ if __name__ == "__main__":
         "--model_dir",
         type=str,
         # default="./resources/anti_spoof_models",
-        default="./saved_logs/snapshot/Anti_Spoofing_1.2_112x112",
+        default="./saved_logs/snapshot/Old_Anti_Spoofing_1.2_112x112",
         help="model_lib used to test")
     parser.add_argument(
         "--image_name",
@@ -305,5 +307,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # test(args.image_name, args.model_dir, args.device_id)
 
-    test_video(args.image_name, args.model_dir, args.device_id)
-    # calculate_acc("/home/dmp/Silent-Face-Anti-Spoofing/datasets/RGB_Images/1.2_112x112/test_caffee_model", args.model_dir, args.device_id)
+    # test_video(args.image_name, args.model_dir, args.device_id)
+    calculate_acc("./datasets/data", args.model_dir, args.device_id)

@@ -19,11 +19,11 @@ def get_data_loader(conf):
         trans.RandomResizedCrop(size=tuple(conf.input_size),
                                 scale=(0.9, 1.1)),
         trans.ColorJitter(brightness=0.4,
-                          contrast=0.4, saturation=0.4, hue=0.1),
+                          contrast=0.4, saturation=0.4, hue=0.2),
         trans.RandomRotation(10),
         trans.RandomHorizontalFlip(),
         trans.ToTensor(),
-        trans.Normalize(mean, std)
+        # trans.Normalize(mean, std)
     ])
     root_path = '{}/{}'.format(conf.train_root_path, conf.patch_info)
     trainset = DatasetFolderFT(root_path + "/train" , train_transform,

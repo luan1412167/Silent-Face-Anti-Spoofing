@@ -21,11 +21,11 @@ def get_default_config():
     # ----------------------training---------------
     conf.lr = 1e-3
     # [9, 13, 15]
-    conf.milestones = [50, 150, 220]  # down learing rate
+    conf.milestones = [100, 150, 220, 350]  # down learing rate
     conf.gamma = 0.1
-    conf.epochs = 250
+    conf.epochs = 500
     conf.momentum = 0.9
-    conf.batch_size = 32
+    conf.batch_size = 128
 
     # model
     conf.num_classes = 2
@@ -33,7 +33,7 @@ def get_default_config():
     conf.embedding_size = 128
 
     # dataset
-    conf.train_root_path = './datasets/RGB_Images'
+    conf.train_root_path = './datasets/rgb_image'
 
     # save file path
     conf.snapshot_dir_path = './saved_logs/snapshot'

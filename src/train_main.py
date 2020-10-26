@@ -16,10 +16,10 @@ from src.utility import get_time
 from src.model_lib.MultiFTNet import MultiFTNet, MultiFTNetReload
 from src.data_io.dataset_loader import get_data_loader
 import torch.nn.functional as F
-
+import numpy as np
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma = 2, eps = 1e-7):
+    def __init__(self, gamma = 5, eps = 1e-7):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.eps = eps
@@ -30,7 +30,6 @@ class FocalLoss(nn.Module):
         p = torch.exp(-logp)
         loss = (1 - p) ** self.gamma * logp
         return loss.mean()
-
 
 class DepthFocalLoss(nn.Module):
     def __init__(self, gamma = 1, eps = 1e-7):
@@ -43,6 +42,58 @@ class DepthFocalLoss(nn.Module):
         loss = self.ce(input, target)
         loss = (loss) ** self.gamma
         return loss.mean()
+
+def contrast_depth_conv(input):
+    ''' compute contrast depth in both of (out, label) '''
+    '''
+        input  32x32
+        output 8x32x32
+    '''
+    
+
+    kernel_filter_list =[
+                        [[1,0,0],[0,-1,0],[0,0,0]], [[0,1,0],[0,-1,0],[0,0,0]], [[0,0,1],[0,-1,0],[0,0,0]],
+                        [[0,0,0],[1,-1,0],[0,0,0]], [[0,0,0],[0,-1,1],[0,0,0]],
+                        [[0,0,0],[0,-1,0],[1,0,0]], [[0,0,0],[0,-1,0],[0,1,0]], [[0,0,0],[0,-1,0],[0,0,1]]
+                        ]
+    
+    kernel_filter = np.array(kernel_filter_list, np.float32)
+    
+    kernel_filter = torch.from_numpy(kernel_filter.astype(np.float)).float().cuda()
+    # weights (in_channel, out_channel, kernel, kernel)
+    kernel_filter = kernel_filter.unsqueeze(dim=1)
+    # print("input.shape[0], 8, input.shape[1],input.shape[2]", input.shape[0], 8, input.shape[1],input.shape[2])
+    input = input.expand(input.shape[0], 8, input.shape[2],input.shape[3])
+    
+    contrast_depth = F.conv2d(input, weight=kernel_filter, groups=8)  # depthwise conv
+    
+    return contrast_depth
+
+
+class Contrast_depth_loss(nn.Module):    # Pearson range [-1, 1] so if < 0, abs|loss| ; if >0, 1- loss
+    def __init__(self):
+        super(Contrast_depth_loss,self).__init__()
+        return
+    def forward(self, out, label): 
+        '''
+        compute contrast depth in both of (out, label),
+        then get the loss of them
+        tf.atrous_convd match tf-versions: 1.4
+        '''
+        contrast_out = contrast_depth_conv(out)
+        contrast_label = contrast_depth_conv(label)
+        
+        
+        criterion_MSE = nn.MSELoss().cuda()
+    
+        loss = criterion_MSE(contrast_out, contrast_label)
+        #loss = torch.pow(contrast_out - contrast_label, 2)
+        loss = torch.mean(loss)
+    
+        return loss
+
+
+
 class TrainMain:
     def __init__(self, conf):
         self.conf = conf
@@ -60,22 +111,21 @@ class TrainMain:
         # self.cls_criterion = CrossEntropyLoss()
         # self.ft_criterion = MSELoss()
         self.cls_criterion = FocalLoss()
-        self.ft_criterion = DepthFocalLoss()
+        self.ft_criterion = Contrast_depth_loss()
 
         self.model = self._define_network()
-        self.optimizer = optim.SGD(self.model.module.parameters(),
-                                   lr=self.conf.lr,
-                                   weight_decay=5e-4,
-                                   momentum=self.conf.momentum)
+        # self.optimizer = optim.SGD(self.model.module.parameters(),
+        #                            lr=self.conf.lr,
+        #                            weight_decay=5e-4,
+        #                            momentum=self.conf.momentum)
 
         # new 
-        # self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr,
-        #                         weight_decay=5e-4)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr)
 
-        # self.schedule_lr = optim.lr_scheduler.MultiStepLR(
-        #     self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
+        self.schedule_lr = optim.lr_scheduler.MultiStepLR(
+            self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
         # new
-        self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=3, verbose=True)
+        # self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=4, verbose=True)
 
         print("lr: ", self.conf.lr)
         print("epochs: ", self.conf.epochs)
@@ -134,13 +184,13 @@ class TrainMain:
             self.writer.add_scalars(
                 'Training/Loss_cls', {'training loss cls' : loss_cls_board,
                                       'validate loss cls' : total_loss_cls}, e)
-            print("Training epoch {} => running_loss_cls = {}, running_acc = {}".format(e, loss_cls_board, acc_board))
-            print("Evaluate epoch {} => total_loss_cls = {}, total_acc = {}".format(e, total_loss_cls, total_acc))
+            print("Training epoch {} => running_loss_cls = {}, running_acc = {}".format(e, loss_cls_board, acc_board.item()))
+            print("Evaluate epoch {} => total_loss_cls = {}, total_acc = {}".format(e, total_loss_cls, total_acc.item()))
             running_loss = 0.
             running_acc = []
             running_loss_cls = 0.
             running_loss_ft = 0.
-            self.schedule_lr.step(acc_board)
+            self.schedule_lr.step()
 
         time_stamp = get_time()
         self._save_state(time_stamp, extra=self.conf.job_name)
@@ -151,13 +201,12 @@ class TrainMain:
         self.optimizer.zero_grad()
         labels = labels.to(self.conf.device)
         embeddings, feature_map = self.model.forward(imgs[0].to(self.conf.device))
-        # embeddings = torch.sigmoid(embeddings)
-        # print("embeddings ", embeddings, labels)
+
 
         loss_cls = self.cls_criterion(embeddings, labels)
+        # print("feature_map", feature_map.shape, imgs[1].shape)
         loss_fea = self.ft_criterion(feature_map, imgs[1].to(self.conf.device))
-
-        loss = 0.5*loss_cls + 0.5*loss_fea
+        loss = 0.7*loss_cls + 0.3*loss_fea
         acc = self._get_accuracy(embeddings, labels)[0]
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
@@ -174,7 +223,6 @@ class TrainMain:
 
                 labels = labels.to(self.conf.device)
                 embeddings = self.model.forward(imgs[0].to(self.conf.device))
-                # embeddings = torch.sigmoid(embeddings)
                 total_loss_cls += self.cls_criterion(embeddings, labels)
                 total_acc.append(self._get_accuracy(embeddings, labels)[0])
         return total_loss_cls / len(total_acc), sum(total_acc) / len(total_acc)
@@ -233,19 +281,19 @@ class TrainMainPretrain:
         self.cls_criterion = CrossEntropyLoss()
         self.ft_criterion = MSELoss()
         self.model = self._define_network_pretrain(model_path)
-        self.optimizer = optim.SGD(self.model.parameters(),
-                                   lr=self.conf.lr,
-                                   weight_decay=5e-4,
-                                   momentum=self.conf.momentum)
+        # self.optimizer = optim.SGD(self.model.parameters(),
+        #                            lr=self.conf.lr,
+        #                            weight_decay=5e-4,
+        #                            momentum=self.conf.momentum)
 
         # new 
-        # self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr,
-        #                         weight_decay=5e-4)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr,
+                                weight_decay=5e-4)
 
-        self.schedule_lr = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
+        # self.schedule_lr = optim.lr_scheduler.MultiStepLR(
+        #     self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
         # new
-        # self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=3, verbose=True)
+        self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=3, verbose=True)
 
         print("lr: ", self.conf.lr)
         print("epochs: ", self.conf.epochs)
@@ -309,7 +357,7 @@ class TrainMainPretrain:
             running_acc = []
             running_loss_cls = 0.
             running_loss_ft = 0.
-            self.schedule_lr.step()
+            self.schedule_lr.step(total_acc)
 
         time_stamp = get_time()
         self._save_state(time_stamp, extra=self.conf.job_name)

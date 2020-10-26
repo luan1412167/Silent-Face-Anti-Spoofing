@@ -32,7 +32,7 @@ if __name__ == "__main__":
     trainer = TrainMain(conf)
     trainer.train_model()
     # transfer learning
-    # model_path = '/home/dmp/Silent-Face-Anti-Spoofing/resources/temp/2.7_80x80_MiniFASNetV2.pth'
+    # model_path = './resources/temp/2.7_80x80_MiniFASNetV2.pth'
     # trainer.train_model(model_path)
 
 

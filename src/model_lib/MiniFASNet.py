@@ -26,12 +26,12 @@ class Conv_block(Module):
         self.conv = Conv2d(in_c, out_c, kernel_size=kernel, groups=groups,
                            stride=stride, padding=padding, bias=False)
         self.bn = BatchNorm2d(out_c)
-        self.prelu = PReLU(out_c)
+        self.relu = ReLU(out_c)
 
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
-        x = self.prelu(x)
+        x = self.relu(x)
         return x
 
 
@@ -163,9 +163,7 @@ class Depth_Wise_SE(Module):
 class MiniFASNet(Module):
     def __init__(self, keep, embedding_size, conv6_kernel=(7, 7),
                  drop_p=0.0, num_classes=3, img_channel=3):
-        # print("conv6_kernel ", conv6_kernel, conv6_kernel== (5,5), num_classes)
-        if conv6_kernel== (5,5):
-            num_classes = 3
+                 
         super(MiniFASNet, self).__init__()
         self.embedding_size = embedding_size
 
@@ -295,5 +293,5 @@ def MiniFASNetV1SE(embedding_size=128, conv6_kernel=(7, 7),
 
 # (80x80) flops: 0.044, params: 0.43
 def MiniFASNetV2SE(embedding_size=128, conv6_kernel=(7, 7),
-                   drop_p=0.75, num_classes=4, img_channel=3):
+                   drop_p=0.75, num_classes=2, img_channel=3):
     return MiniFASNetSE(keep_dict['1.8M_'], embedding_size, conv6_kernel,drop_p, num_classes, img_channel)

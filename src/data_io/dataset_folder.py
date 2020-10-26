@@ -13,6 +13,9 @@ import numpy as np
 
 def opencv_loader(path):
     img = cv2.imread(path)
+    if img.shape[1] != 112:
+        img = cv2.resize(img, (112, 112), interpolation=cv2.INTER_AREA)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
 
@@ -50,7 +53,7 @@ class DatasetFolderFT(datasets.ImageFolder):
 
 
 def generate_FT(image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     f = np.fft.fft2(image)
     fshift = np.fft.fftshift(f)
     fimg = np.log(np.abs(fshift)+1)

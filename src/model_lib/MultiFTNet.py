@@ -82,15 +82,33 @@ class MultiFTNet(nn.Module):
     def forward(self, x):
         x = self.model.conv1(x)
         x = self.model.conv2_dw(x)
+        
+        x = self.model.drop(x)
+
         x = self.model.conv_23(x)
         x = self.model.conv_3(x)
+
+        x = self.model.drop(x)
+
         x = self.model.conv_34(x)
         x = self.model.conv_4(x)
+
+        x = self.model.drop(x)
+
         x1 = self.model.conv_45(x)
         x1 = self.model.conv_5(x1)
+
+        x1 = self.model.drop(x1)
+        
         x1 = self.model.conv_6_sep(x1)
+
+        x1 = self.model.drop(x1)
+
         x1 = self.model.conv_6_dw(x1)
         x1 = self.model.conv_6_flatten(x1)
+
+        x1 = self.model.drop(x1)
+
         x1 = self.model.linear(x1)
         x1 = self.model.bn(x1)
         x1 = self.model.drop(x1)
