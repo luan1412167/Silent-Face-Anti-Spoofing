@@ -23,7 +23,7 @@ def get_data_loader(conf):
         trans.RandomRotation(10),
         trans.RandomHorizontalFlip(),
         trans.ToTensor(),
-        # trans.Normalize(mean, std)
+        trans.Normalize(mean, std)
     ])
     root_path = '{}/{}'.format(conf.train_root_path, conf.patch_info)
     trainset = DatasetFolderFT(root_path + "/train" , train_transform,
@@ -35,12 +35,12 @@ def get_data_loader(conf):
         batch_size=conf.batch_size,
         shuffle=True,
         pin_memory=True,
-        num_workers=8)
+        num_workers=16)
 
     test_loader = DataLoader(
         testset,
         batch_size=conf.batch_size,
         shuffle=False,
         pin_memory=True,
-        num_workers=8)
+        num_workers=16)
     return train_loader, test_loader

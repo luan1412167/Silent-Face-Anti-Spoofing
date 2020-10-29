@@ -56,8 +56,8 @@ def to_tensor(pic):
 
         img = torch.from_numpy(pic.transpose((2, 0, 1)))
         # backward compatibility
-        # return img.float().div(255)
-        return img.float()
+        return img.float().div(255)
+        # return img.float()
     if accimage is not None and isinstance(pic, accimage.Image):
         nppic = np.zeros([pic.channels, pic.height, pic.width], dtype=np.float32)
         pic.copyto(nppic)
@@ -82,8 +82,8 @@ def to_tensor(pic):
     # yikes, this transpose takes 80% of the loading time/CPU
     img = img.transpose(0, 1).transpose(0, 2).contiguous()
     if isinstance(img, torch.ByteTensor):
-        # return img.float().div(255)  #modified by zkx
-        return img.float()
+        return img.float().div(255)  #modified by zkx
+        # return img.float()
     else:
         return img
 
