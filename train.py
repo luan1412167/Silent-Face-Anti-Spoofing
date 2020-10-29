@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--device_ids", type=str, default="0", help="which gpu id, 0123")
     parser.add_argument("--patch_info", type=str, default="1.2_112x112",
                         help="[org_1_80x60 / 1_80x80 / 2.7_80x80 / 4_80x80]")
+    parser.add_argument("--name_logs", type=str, default="Anti_Spoofing_1.2_112x112", help="folder name to save model")
     args = parser.parse_args()
     cuda_devices = [int(elem) for elem in args.device_ids]
     os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, cuda_devices))

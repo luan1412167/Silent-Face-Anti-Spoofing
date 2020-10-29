@@ -17,9 +17,11 @@ from src.model_lib.MultiFTNet import MultiFTNet, MultiFTNetReload
 from src.data_io.dataset_loader import get_data_loader
 import torch.nn.functional as F
 import numpy as np
+from adabelief_pytorch import AdaBelief
+
 
 class FocalLoss(nn.Module):
-    def __init__(self, gamma = 5, eps = 1e-7):
+    def __init__(self, gamma = 3, eps = 1e-7):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.eps = eps
@@ -93,6 +95,34 @@ class Contrast_depth_loss(nn.Module):    # Pearson range [-1, 1] so if < 0, abs|
         return loss
 
 
+def smooth_one_hot(true_labels: torch.Tensor, classes: int, smoothing=0.0):
+    """
+    if smoothing == 0, it's one-hot method
+    if 0 < smoothing < 1, it's smooth method
+
+    """
+    assert 0 <= smoothing < 1
+    confidence = 1.0 - smoothing
+    label_shape = torch.Size((true_labels.size(0), classes))
+    with torch.no_grad():
+        true_dist = torch.empty(size=label_shape, device=true_labels.device)
+        true_dist.fill_(smoothing / (classes - 1))
+        true_dist.scatter_(1, true_labels.data.unsqueeze(1), confidence)
+    return true_dist
+
+
+class LabelSmoothingCrossEntropy(nn.Module):
+    def __init__(self):
+        super(LabelSmoothingCrossEntropy, self).__init__()
+    def forward(self, x, target, smoothing=0.1):
+        confidence = 1. - smoothing
+        logprobs = F.log_softmax(x, dim=-1)
+        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+        nll_loss = nll_loss.squeeze(1)
+        smooth_loss = -logprobs.mean(dim=-1)
+        loss = confidence * nll_loss + smoothing * smooth_loss
+        return loss.mean()
+
 
 class TrainMain:
     def __init__(self, conf):
@@ -110,10 +140,10 @@ class TrainMain:
     def _init_model_param(self):
         # self.cls_criterion = CrossEntropyLoss()
         # self.ft_criterion = MSELoss()
-        self.cls_criterion = FocalLoss()
-        self.ft_criterion_mse = MSELoss()
-        self.ft_criterion_cdl = Contrast_depth_loss()
-
+        self.cls_criterion = LabelSmoothingCrossEntropy()
+        # self.ft_criterion_mse = MSELoss()
+        # self.ft_criterion_cdl = Contrast_depth_loss()
+        self.ft_criterion = DepthFocalLoss()
         self.model = self._define_network()
         # self.optimizer = optim.SGD(self.model.module.parameters(),
         #                            lr=self.conf.lr,
@@ -121,12 +151,14 @@ class TrainMain:
         #                            momentum=self.conf.momentum)
 
         # new 
-        self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr)
+        # self.optimizer = optim.AdamW(self.model.parameters(), lr= self.conf.lr)
+        self.optimizer = AdaBelief(self.model.parameters(), lr=1e-3, eps=1e-16, betas=(0.9,0.999), weight_decouple = True, rectify = False)
 
-        self.schedule_lr = optim.lr_scheduler.MultiStepLR(
-            self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
+
+        # self.schedule_lr = optim.lr_scheduler.MultiStepLR(
+        #     self.optimizer, self.conf.milestones, self.conf.gamma, - 1)
         # new
-        # self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=4, verbose=True)
+        self.schedule_lr = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='max', patience=4, verbose=True)
 
         print("lr: ", self.conf.lr)
         print("epochs: ", self.conf.epochs)
@@ -191,7 +223,7 @@ class TrainMain:
             running_acc = []
             running_loss_cls = 0.
             running_loss_ft = 0.
-            self.schedule_lr.step()
+            self.schedule_lr.step(total_acc.item())
 
         time_stamp = get_time()
         self._save_state(time_stamp, extra=self.conf.job_name)
@@ -203,13 +235,17 @@ class TrainMain:
         labels = labels.to(self.conf.device)
         embeddings, feature_map = self.model.forward(imgs[0].to(self.conf.device))
 
+        # smooth_label = smooth_one_hot(labels, 2, 0.2)
+        # loss_cls = self.cls_criterion(embeddings, smooth_label)
 
         loss_cls = self.cls_criterion(embeddings, labels)
         # print("feature_map", feature_map.shape, imgs[1].shape)
-        loss_fea_mse = self.ft_criterion_mse(feature_map, imgs[1].to(self.conf.device))
-        loss_fea_cdl = self.ft_criterion_cdl(feature_map, imgs[1].to(self.conf.device))
-        loss_fea = 0.5*(loss_fea_mse + loss_fea_cdl)
-        loss = 0.7*loss_cls + 0.3*loss_fea
+        # loss_fea_mse = self.ft_criterion_mse(feature_map, imgs[1].to(self.conf.device))
+        # loss_fea_cdl = self.ft_criterion_cdl(feature_map, imgs[1].to(self.conf.device))
+        loss_fea = self.ft_criterion(feature_map, imgs[1].to(self.conf.device))
+        # print("loss", loss_fea_mse.item(), loss_fea_cdl.item(), loss_cls.item())
+        # loss_fea = 0.5*(loss_fea_mse + loss_fea_cdl)
+        loss = 0.5*loss_cls + 0.5*loss_fea
         acc = self._get_accuracy(embeddings, labels)[0]
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)

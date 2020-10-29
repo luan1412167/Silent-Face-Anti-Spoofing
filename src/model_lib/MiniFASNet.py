@@ -6,7 +6,7 @@
 # @Software : PyCharm
 import torch
 import torch.nn.functional as F
-from torch.nn import Linear, Conv2d, BatchNorm1d, BatchNorm2d, PReLU, ReLU, Sigmoid, \
+from torch.nn import Linear, Conv2d, BatchNorm1d, BatchNorm2d, PReLU, LeakyReLU, ReLU, Sigmoid, \
     AdaptiveAvgPool2d, Sequential, Module
 
 
@@ -26,12 +26,12 @@ class Conv_block(Module):
         self.conv = Conv2d(in_c, out_c, kernel_size=kernel, groups=groups,
                            stride=stride, padding=padding, bias=False)
         self.bn = BatchNorm2d(out_c)
-        self.relu = ReLU(out_c)
+        self.lrelu = LeakyReLU()
 
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
-        x = self.relu(x)
+        x = self.lrelu(x)
         return x
 
 

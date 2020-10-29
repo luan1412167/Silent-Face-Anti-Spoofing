@@ -49,6 +49,7 @@ def get_default_config():
 
 
 def update_config(args, conf):
+    conf.snapshot_dir_path = './saved_logs/snapshot/' + args.name_logs 
     conf.devices = args.devices
     conf.patch_info = args.patch_info
     w_input, h_input = get_width_height(args.patch_info)
